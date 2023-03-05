@@ -20,57 +20,91 @@ client_secret = env.str("CLIENT_SECRET")
 
 access_token = env.str("ACCESS_TOKEN_BEARER")
 
-headers = {
-    'Authorization': f'Bearer {access_token}',
-}
-
-product_id = '34f47762-385c-48fb-b985-915d565a3229'
-
-response = requests.get(f'https://api.moltin.com/pcm/products/{product_id}', headers=headers)
-product_data = response.json()
-
-name = product_data['data']['attributes']['name']
-sku = product_data['data']['attributes']['sku']
-description = product_data['data']['attributes']['description']
-
-headers = {
-    'Authorization': f'Bearer {access_token}',
-    'Content-Type': 'application/json',
-}
-
-# json_data = {
-#     'data': {
-#         'type': 'cart_item',
-#         # 'name': name,
-#         'sku': sku,
-#         # 'description': description,
-#         'quantity': 3,
-#         # "price": {
-#         #   "amount": 30
-#         # }
-#     },
-# }
-
-json_data = {
-    'data': {
-        'id': '23d0e2f9-2234-49bc-a132-cf9c3828fec5',
-        'type': 'cart_item',
-        'quantity': 8,
-        'custom_inputs': {
-              "name": {
-                "T-Shirt Front": "Jane",
-                "T-Shirt Back": "Jane Doe's Dance Academy"
-               }
-            }
-    }
-}
-
-response = requests.post('https://api.moltin.com/v2/carts/abc/items', headers=headers, json=json_data)
-
 # headers = {
 #     'Authorization': f'Bearer {access_token}',
+#     'Content-Type': 'application/json',
 # }
-# response = requests.get('https://api.moltin.com/v2/carts/abc/items', headers=headers)
-pprint(response.json())
+#
+# json_data = {
+#     'data': {
+#         'id': '23d0e2f9-2234-49bc-a132-cf9c3828fec5',
+#         'type': 'cart_item',
+#         'quantity': 8,
+#             }
+#         }
+#
+# response = requests.post('https://api.moltin.com/v2/carts/abc/items', headers=headers, json=json_data)
+# pprint(response.json())
+
+import os
+import logging
+import redis
+
+from telegram.ext import Filters, Updater
+from telegram.ext import CallbackQueryHandler, CommandHandler, MessageHandler
+
+_database = None
 
 
+def start(update, context):
+    update.message.reply_text(text='Привет!')
+    return "ECHO"
+
+
+def echo(update, context):
+    users_reply = update.message.text
+    update.message.reply_text(users_reply)
+    return "ECHO"
+
+
+def handle_users_reply(update, context):
+    db = get_database_connection()
+    if update.message:
+        user_reply = update.message.text
+        chat_id = update.message.chat_id
+    elif update.callback_query:
+        user_reply = update.callback_query.data
+        chat_id = update.callback_query.message.chat_id
+    else:
+        return
+    if user_reply == '/start':
+        user_state = 'START'
+    else:
+        user_state = db.get(chat_id)
+
+    print(user_state)
+
+    states_functions = {
+        'START': start,
+        'ECHO': echo
+    }
+    state_handler = states_functions[user_state]
+    try:
+        next_state = state_handler(update, context)
+        db.set(chat_id, next_state)
+    except Exception as err:
+        print(err)
+
+
+def get_database_connection():
+    global _database
+    if _database is None:
+        database_password = env.str("DATABASE_PASSWORD")
+        database_host = env.str("DATABASE_HOST")
+        database_port = env.str("DATABASE_PORT")
+        _database = redis.StrictRedis(host=database_host,
+                                      port=database_port,
+                                      password=database_password,
+                                      charset="utf-8",
+                                      decode_responses=True)
+    return _database
+
+
+if __name__ == '__main__':
+    token = env.str("TG_BOT_TOKEN")
+    updater = Updater(token)
+    dispatcher = updater.dispatcher
+    dispatcher.add_handler(CommandHandler('start', handle_users_reply))
+    dispatcher.add_handler(CallbackQueryHandler(handle_users_reply))
+    dispatcher.add_handler(MessageHandler(Filters.text, handle_users_reply))
+    updater.start_polling()
