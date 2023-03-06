@@ -5,6 +5,8 @@ import os
 import logging
 import redis
 
+from textwrap import dedent
+from telegram import ParseMode
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Filters, Updater
 from telegram.ext import CallbackQueryHandler, CommandHandler, MessageHandler
@@ -41,11 +43,20 @@ def get_product_params(access_token, product_id):
             'Authorization': f'Bearer {access_token}',
         }
     params = {
-        'include': 'component_products',
+        'include': 'prices',
     }
     response = requests.get(f'https://api.moltin.com/pcm/products/{product_id}',
                             headers=headers,
                             params=params)
+    return response.json()
+
+
+def get_product_prices(access_token, product_id):
+    headers = {
+            'Authorization': f'Bearer {access_token}',
+        }
+    response = requests.get(f'https://api.moltin.com/pcm/pricebooks/5740a00e-5988-45f7-924a-c70f7697d8d4/prices',
+                            headers=headers)
     return response.json()
 
 
@@ -123,13 +134,29 @@ def button(update, context):
         if product_params['errors'][0]['status'] == 401:
             access_token = get_token()
             product_params = get_product_params(access_token, product_id)
-        pprint(product_params)
+        product_name = product_params['data']['attributes']['name']
+        product_description = product_params['data']['attributes']['description']
+        product_sku = product_params['data']['attributes']['sku']
+        product_prices = get_product_prices(access_token, product_id)
+        for price in product_prices['data']:
+            if price['attributes']['sku'] == product_sku:
+                product_price = price['attributes']['currencies']['USD']['amount']
+
+        product_message = dedent(f"""\
+                        <b>Вы выбрали продукт:</b>
+                        {product_name}
+                        <b>Описание:</b>
+                        {product_description}
+                        <b>Цена в за единицу товара:</b>
+                        {product_price}$
+                        """).replace("    ", "")
 
         context.bot.edit_message_text(
-            text=f"Selected option: {query.data}",
+            text=product_message,
             chat_id=query.message.chat_id,
             message_id=query.message.message_id,
-            reply_markup=reply_markup)
+            reply_markup=reply_markup,
+            parse_mode=ParseMode.HTML)
         return "PRODUCT"
 
 
@@ -207,3 +234,10 @@ if __name__ == '__main__':
 
     updater.start_polling()
     updater.idle()
+
+# {'data': [{'attributes': {'currencies': {'USD': {'amount': 2000,
+#                                                  'includes_tax': True}},
+#                           'sku': '1'},
+#            'id': 'a2f9781e-2406-41dd-a032-cbc4ce3043ae',
+#            'meta': {'owner': 'store'},
+#            'type': 'product-price'},
