@@ -140,7 +140,7 @@ def button(update, context):
         product_prices = get_product_prices(access_token, product_id)
         for price in product_prices['data']:
             if price['attributes']['sku'] == product_sku:
-                product_price = price['attributes']['currencies']['USD']['amount']
+                product_price = float(price['attributes']['currencies']['USD']['amount'])/100
 
         product_message = dedent(f"""\
                         <b>Вы выбрали продукт:</b>
