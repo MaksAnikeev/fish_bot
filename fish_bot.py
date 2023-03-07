@@ -51,12 +51,20 @@ def get_product_params(access_token, product_id):
     return response.json()
 
 
-def get_product_prices(access_token, product_id):
+def get_product_prices(access_token, price_id):
     headers = {
             'Authorization': f'Bearer {access_token}',
         }
-    response = requests.get(f'https://api.moltin.com/pcm/pricebooks/5740a00e-5988-45f7-924a-c70f7697d8d4/prices',
+    response = requests.get(f'https://api.moltin.com/pcm/pricebooks/{price_id}/prices',
                             headers=headers)
+    return response.json()
+
+
+def get_product_files(access_token, file_id):
+    headers = {
+            'Authorization': f'Bearer {access_token}',
+        }
+    response = requests.get(f'https://api.moltin.com/v2/files/{file_id}', headers=headers)
     return response.json()
 
 
@@ -91,11 +99,17 @@ def send_products_keyboard(update, context, products_names):
     query = update.callback_query
     keyboard = list(chunked(products_names, 2))
     reply_markup = InlineKeyboardMarkup(keyboard)
-    context.bot.edit_message_text(text='Выбери товар из магазина:',
-                                  chat_id=query.message.chat_id,
-                                  message_id=query.message.message_id,
-                                  reply_markup=reply_markup)
-    return "STORE"
+    try:
+        context.bot.edit_message_text(text='Выбери товар из магазина:',
+                                      chat_id=query.message.chat_id,
+                                      message_id=query.message.message_id,
+                                      reply_markup=reply_markup)
+        return "STORE"
+    except:
+        context.bot.send_message(text='Выбери товар из магазина:',
+                                       chat_id=query.message.chat_id,
+                                       reply_markup=reply_markup)
+        return "STORE"
 
 
 def button(update, context):
@@ -134,13 +148,20 @@ def button(update, context):
         if product_params['errors'][0]['status'] == 401:
             access_token = get_token()
             product_params = get_product_params(access_token, product_id)
+
+        pprint(product_params)
+
         product_name = product_params['data']['attributes']['name']
         product_description = product_params['data']['attributes']['description']
         product_sku = product_params['data']['attributes']['sku']
-        product_prices = get_product_prices(access_token, product_id)
+
+        price_id = '5740a00e-5988-45f7-924a-c70f7697d8d4'
+        product_prices = get_product_prices(access_token, price_id)
         for price in product_prices['data']:
             if price['attributes']['sku'] == product_sku:
                 product_price = float(price['attributes']['currencies']['USD']['amount'])/100
+
+        # print(product_price)
 
         product_message = dedent(f"""\
                         <b>Вы выбрали продукт:</b>
@@ -150,15 +171,27 @@ def button(update, context):
                         <b>Цена в за единицу товара:</b>
                         {product_price}$
                         """).replace("    ", "")
+        try:
+            product_file_id = product_params['data']['relationships']['main_image']['data']['id']
+            product_image_params = get_product_files(access_token,
+                                                     file_id=product_file_id)
+            product_image_url = product_image_params['data']['link']['href']
+            product_image = requests.get(product_image_url)
+            query.message.reply_photo(
+                product_image.content,
+                caption=product_message,
+                reply_markup=reply_markup,
+                parse_mode=ParseMode.HTML)
+            return "PRODUCT"
 
-        context.bot.edit_message_text(
-            text=product_message,
-            chat_id=query.message.chat_id,
-            message_id=query.message.message_id,
-            reply_markup=reply_markup,
-            parse_mode=ParseMode.HTML)
-        return "PRODUCT"
-
+        except:
+            context.bot.edit_message_text(
+                text=product_message,
+                chat_id=query.message.chat_id,
+                message_id=query.message.message_id,
+                reply_markup=reply_markup,
+                parse_mode=ParseMode.HTML)
+            return "PRODUCT"
 
 
 def handle_users_reply(update, context):
