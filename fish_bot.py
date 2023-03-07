@@ -100,15 +100,23 @@ def send_products_keyboard(update, context, products_names):
     keyboard = list(chunked(products_names, 2))
     reply_markup = InlineKeyboardMarkup(keyboard)
     try:
-        context.bot.edit_message_text(text='Выбери товар из магазина:',
-                                      chat_id=query.message.chat_id,
-                                      message_id=query.message.message_id,
-                                      reply_markup=reply_markup)
+        context.bot.edit_message_text(
+            text='Выбери товар из магазина:',
+            chat_id=query.message.chat_id,
+            message_id=query.message.message_id,
+            reply_markup=reply_markup
+        )
         return "STORE"
     except:
-        context.bot.send_message(text='Выбери товар из магазина:',
-                                       chat_id=query.message.chat_id,
-                                       reply_markup=reply_markup)
+        context.bot.delete_message(
+            chat_id=query.message.chat_id,
+            message_id=query.message.message_id
+        )
+        context.bot.send_message(
+            text='Выбери товар из магазина:',
+            chat_id=query.message.chat_id,
+            reply_markup=reply_markup
+        )
         return "STORE"
 
 
@@ -149,7 +157,7 @@ def button(update, context):
             access_token = get_token()
             product_params = get_product_params(access_token, product_id)
 
-        pprint(product_params)
+        # pprint(product_params)
 
         product_name = product_params['data']['attributes']['name']
         product_description = product_params['data']['attributes']['description']
@@ -177,6 +185,11 @@ def button(update, context):
                                                      file_id=product_file_id)
             product_image_url = product_image_params['data']['link']['href']
             product_image = requests.get(product_image_url)
+
+            context.bot.delete_message(
+                chat_id=query.message.chat_id,
+                message_id=query.message.message_id
+            )
             query.message.reply_photo(
                 product_image.content,
                 caption=product_message,
@@ -267,10 +280,3 @@ if __name__ == '__main__':
 
     updater.start_polling()
     updater.idle()
-
-# {'data': [{'attributes': {'currencies': {'USD': {'amount': 2000,
-#                                                  'includes_tax': True}},
-#                           'sku': '1'},
-#            'id': 'a2f9781e-2406-41dd-a032-cbc4ce3043ae',
-#            'meta': {'owner': 'store'},
-#            'type': 'product-price'},
