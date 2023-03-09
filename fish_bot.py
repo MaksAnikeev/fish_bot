@@ -254,8 +254,6 @@ def add_product_to_cart(update, context):
 
 def show_cart(update, context, access_token):
     query = update.callback_query
-    keyboard = [[InlineKeyboardButton("Главное меню", callback_data='main_menu')]]
-    reply_markup = InlineKeyboardMarkup(keyboard)
 
     tg_id = context.user_data['tg_id']
 
@@ -287,6 +285,15 @@ def show_cart(update, context, access_token):
 
     products_in_cart = ' '.join(products_in_cart_list)
 
+    keyboard = [[InlineKeyboardButton("Главное меню", callback_data='main_menu')]]
+    for product in products_in_cart_params['data']:
+        button_name = f'Убрать из корзины {product["name"]}'
+        button_id = product['id']
+        button = [InlineKeyboardButton(button_name, callback_data=f'delete {button_id}')]
+        keyboard.insert(0, button)
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+
     context.bot.edit_message_text(
         text=products_in_cart,
         chat_id=query.message.chat_id,
@@ -294,6 +301,22 @@ def show_cart(update, context, access_token):
         parse_mode=ParseMode.HTML,
         reply_markup=reply_markup)
     return 'CART'
+
+
+def delete_product_from_cart(update, context, access_token):
+    product_id = context.user_data['delete_product_id']
+    check = check_token(access_token)
+    if not check.ok:
+        access_token = get_token()
+
+    tg_id = context.user_data['tg_id']
+
+    headers = {
+        'Authorization': f'Bearer {access_token}',
+    }
+    requests.delete(f'https://api.moltin.com/v2/carts/{tg_id}/items/{product_id}', headers=headers)
+
+    return show_cart(update, context, access_token)
 
 
 def button(update, context):
@@ -317,6 +340,11 @@ def button(update, context):
     elif query.data == '1kg' or query.data == '5kg' or query.data == '10kg':
         context.user_data['product_quantity'] = int(query.data.replace('kg', ''))
         return add_product_to_cart(update, context)
+
+    elif 'delete' in query.data:
+        product_id = query.data.replace('delete ', '')
+        context.user_data['delete_product_id'] = product_id
+        return delete_product_from_cart(update, context, access_token)
 
     else:
         return send_product_description(update, context, access_token)
