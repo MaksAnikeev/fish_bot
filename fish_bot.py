@@ -16,6 +16,14 @@ from functools import partial
 _database = None
 
 
+def check_token(access_token):
+    headers = {
+            'Authorization': f'Bearer {access_token}',
+        }
+    response = requests.get('https://api.moltin.com/pcm/products', headers=headers)
+    return response
+
+
 def get_token():
     client_id = env.str("CLIENT_ID")
     client_secret = env.str("CLIENT_SECRET")
@@ -51,11 +59,11 @@ def get_product_params(access_token, product_id):
     return response.json()
 
 
-def get_product_prices(access_token, price_id):
+def get_products_prices(access_token, price_list_id):
     headers = {
             'Authorization': f'Bearer {access_token}',
         }
-    response = requests.get(f'https://api.moltin.com/pcm/pricebooks/{price_id}/prices',
+    response = requests.get(f'https://api.moltin.com/pcm/pricebooks/{price_list_id}/prices',
                             headers=headers)
     return response.json()
 
@@ -79,6 +87,9 @@ def get_products_names(products_params):
 
 
 def start(update, context):
+    if not update.callback_query:
+        context.user_data['tg_id'] = update.message.from_user.id
+
     keyboard = [[InlineKeyboardButton("Магазин", callback_data='store'),
                  InlineKeyboardButton("Моя корзина", callback_data='cart')]]
 
@@ -120,6 +131,171 @@ def send_products_keyboard(update, context, products_names):
         return "STORE"
 
 
+def send_product_description(update, context, access_token):
+    query = update.callback_query
+    keyboard = [[InlineKeyboardButton("1кг", callback_data='1kg'),
+                 InlineKeyboardButton("5кг", callback_data='5kg'),
+                 InlineKeyboardButton("10кг", callback_data='10kg')],
+                [InlineKeyboardButton("Назад", callback_data='back')]]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    product_id = query.data
+    context.user_data['product_id'] = product_id
+
+    check = check_token(access_token)
+    if not check.ok:
+        access_token = get_token()
+    context.user_data['access_token'] = access_token
+
+    product_params = get_product_params(access_token, product_id)
+    product_name = product_params['data']['attributes']['name']
+    product_description = product_params['data']['attributes']['description']
+    product_sku = product_params['data']['attributes']['sku']
+
+    context.user_data['product_name'] = product_name
+
+    products_prices = dispatcher.bot_data['products_prices']
+    for price in products_prices['data']:
+        if price['attributes']['sku'] == product_sku:
+            product_price = "%.2f" % (price['attributes']['currencies']['USD']['amount']/100)
+
+    product_message = dedent(f"""\
+                            <b>Вы выбрали продукт:</b>
+                            {product_name}
+                            <b>Описание:</b>
+                            {product_description}
+                            <b>Цена в за единицу товара:</b>
+                            {product_price}$
+                            """).replace("    ", "")
+    try:
+        product_file_id = product_params['data']['relationships']['main_image']['data']['id']
+        product_image_params = get_product_files(access_token,
+                                                 file_id=product_file_id)
+        product_image_url = product_image_params['data']['link']['href']
+        product_image = requests.get(product_image_url)
+
+        context.bot.delete_message(
+            chat_id=query.message.chat_id,
+            message_id=query.message.message_id
+        )
+        query.message.reply_photo(
+            product_image.content,
+            caption=product_message,
+            reply_markup=reply_markup,
+            parse_mode=ParseMode.HTML)
+        return "PRODUCT"
+
+    except:
+        context.bot.edit_message_text(
+            text=product_message,
+            chat_id=query.message.chat_id,
+            message_id=query.message.message_id,
+            reply_markup=reply_markup,
+            parse_mode=ParseMode.HTML)
+        return "PRODUCT"
+
+
+
+def add_product_to_cart(update, context):
+    query = update.callback_query
+    tg_id = context.user_data['tg_id']
+    access_token = context.user_data['access_token']
+    product_id = context.user_data['product_id']
+    product_quantity = context.user_data['product_quantity']
+
+    keyboard = [[InlineKeyboardButton("Назад", callback_data='back')]]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    headers = {
+        'Authorization': f'Bearer {access_token}',
+        'Content-Type': 'application/json'
+    }
+    json_data = {
+        'data': {
+            'type': 'cart_item',
+            'id': product_id,
+            "quantity": product_quantity,
+        }
+    }
+    response = requests.post(f'https://api.moltin.com/v2/carts/{tg_id}/items', headers=headers, json=json_data)
+
+    if response.ok:
+        product_name = context.user_data['product_name']
+        add_cart_message = dedent(
+            f"""\
+            <b>Выбранный вами продукт:</b>
+            {product_name}
+             <b>В количестве:</b>
+            {product_quantity}кг
+            <b>Успешно добавлен в вашу корзину</b>
+            """).replace("    ", "")
+        try:
+            context.bot.edit_message_text(
+                text=add_cart_message,
+                chat_id=query.message.chat_id,
+                message_id=query.message.message_id,
+                reply_markup=reply_markup,
+                parse_mode=ParseMode.HTML
+            )
+            return "ADD_CART"
+        except:
+            context.bot.delete_message(
+                chat_id=query.message.chat_id,
+                message_id=query.message.message_id
+            )
+            context.bot.send_message(
+                text=add_cart_message,
+                chat_id=query.message.chat_id,
+                reply_markup=reply_markup,
+                parse_mode=ParseMode.HTML
+            )
+            return "ADD_CART"
+
+
+def show_cart(update, context, access_token):
+    query = update.callback_query
+    keyboard = [[InlineKeyboardButton("Главное меню", callback_data='main_menu')]]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    tg_id = context.user_data['tg_id']
+
+    check = check_token(access_token)
+    if not check.ok:
+        access_token = get_token()
+
+    headers = {
+            'Authorization': f'Bearer {access_token}',
+        }
+    response = requests.get(f'https://api.moltin.com/v2/carts/{tg_id}/items', headers=headers)
+    products_in_cart_params = response.json()
+
+    products_in_cart_list = [
+        f'{count + 1}. {product["name"]}\n' \
+        f'ЦЕНА ЗА ЕДИНИЦУ: {"%.2f" % (product["unit_price"]["amount"]/100)} {product["unit_price"]["currency"]} \n' \
+        f'КОЛИЧЕСТВО: {product["quantity"]} кг \n' \
+        f'СУММА: {"%.2f" % (product["value"]["amount"]/100)} {product["value"]["currency"]}\n\n'
+        for count, product in enumerate(products_in_cart_params['data'])
+    ]
+
+    headers = {
+        'Authorization': f'Bearer {access_token}',
+    }
+    response = requests.get(f'https://api.moltin.com/v2/carts/{tg_id}', headers=headers)
+    cart_params = response.json()
+    cart_sum = f'ИТОГО {cart_params["data"]["meta"]["display_price"]["with_tax"]["formatted"]}'
+    products_in_cart_list.append(cart_sum)
+
+    products_in_cart = ' '.join(products_in_cart_list)
+
+    context.bot.edit_message_text(
+        text=products_in_cart,
+        chat_id=query.message.chat_id,
+        message_id=query.message.message_id,
+        parse_mode=ParseMode.HTML,
+        reply_markup=reply_markup)
+    return 'CART'
+
+
 def button(update, context):
     query = update.callback_query
 
@@ -128,15 +304,7 @@ def button(update, context):
         return send_products_keyboard(update, context, products_names)
 
     elif query.data == 'cart':
-        keyboard = [[InlineKeyboardButton("Главное меню", callback_data='main_menu')]]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-
-        context.bot.edit_message_text(
-            text="Моя корзина",
-            chat_id=query.message.chat_id,
-            message_id=query.message.message_id,
-            reply_markup=reply_markup)
-        return 'CART'
+        return show_cart(update, context, access_token)
 
     elif query.data == 'main_menu':
         return start(update, context)
@@ -146,65 +314,12 @@ def button(update, context):
         send_products_keyboard(update, context, products_names)
         return "DESCRIPTION"
 
+    elif query.data == '1kg' or query.data == '5kg' or query.data == '10kg':
+        context.user_data['product_quantity'] = int(query.data.replace('kg', ''))
+        return add_product_to_cart(update, context)
+
     else:
-        keyboard = [[InlineKeyboardButton("Назад", callback_data='back')]]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-
-        product_id = query.data
-        access_token = env.str("ACCESS_TOKEN_BEARER")
-        product_params = get_product_params(access_token, product_id)
-        if product_params['errors'][0]['status'] == 401:
-            access_token = get_token()
-            product_params = get_product_params(access_token, product_id)
-
-        # pprint(product_params)
-
-        product_name = product_params['data']['attributes']['name']
-        product_description = product_params['data']['attributes']['description']
-        product_sku = product_params['data']['attributes']['sku']
-
-        price_id = '5740a00e-5988-45f7-924a-c70f7697d8d4'
-        product_prices = get_product_prices(access_token, price_id)
-        for price in product_prices['data']:
-            if price['attributes']['sku'] == product_sku:
-                product_price = float(price['attributes']['currencies']['USD']['amount'])/100
-
-        # print(product_price)
-
-        product_message = dedent(f"""\
-                        <b>Вы выбрали продукт:</b>
-                        {product_name}
-                        <b>Описание:</b>
-                        {product_description}
-                        <b>Цена в за единицу товара:</b>
-                        {product_price}$
-                        """).replace("    ", "")
-        try:
-            product_file_id = product_params['data']['relationships']['main_image']['data']['id']
-            product_image_params = get_product_files(access_token,
-                                                     file_id=product_file_id)
-            product_image_url = product_image_params['data']['link']['href']
-            product_image = requests.get(product_image_url)
-
-            context.bot.delete_message(
-                chat_id=query.message.chat_id,
-                message_id=query.message.message_id
-            )
-            query.message.reply_photo(
-                product_image.content,
-                caption=product_message,
-                reply_markup=reply_markup,
-                parse_mode=ParseMode.HTML)
-            return "PRODUCT"
-
-        except:
-            context.bot.edit_message_text(
-                text=product_message,
-                chat_id=query.message.chat_id,
-                message_id=query.message.message_id,
-                reply_markup=reply_markup,
-                parse_mode=ParseMode.HTML)
-            return "PRODUCT"
+        return send_product_description(update, context, access_token)
 
 
 def handle_users_reply(update, context):
@@ -231,6 +346,7 @@ def handle_users_reply(update, context):
         "PRODUCT": button,
         'CART': button,
         "DESCRIPTION": button,
+        "ADD_CART": button,
     }
     state_handler = states_functions[user_state]
     try:
@@ -258,19 +374,22 @@ def get_database_connection():
 if __name__ == '__main__':
     env = environs.Env()
     env.read_env()
-    access_token = env.str("ACCESS_TOKEN_BEARER")
-    products_params = get_products_params(access_token)
-    if products_params['errors'][0]['status'] == 401:
-        access_token = get_token()
-        products_params = get_products_params(access_token)
 
-    products_names = get_products_names(products_params)
+    access_token = env.str("ACCESS_TOKEN_BEARER")
+    check = check_token(access_token)
+    if not check.ok:
+        access_token = get_token()
 
     token = env.str("TG_BOT_TOKEN")
     updater = Updater(token)
     dispatcher = updater.dispatcher
 
+    products_params = get_products_params(access_token)
+    products_names = get_products_names(products_params)
     dispatcher.bot_data['products_names'] = products_names
+
+    price_list_id = '5740a00e-5988-45f7-924a-c70f7697d8d4'
+    dispatcher.bot_data['products_prices'] = get_products_prices(access_token, price_list_id)
 
     dispatcher.add_handler(CommandHandler('start', handle_users_reply))
     dispatcher.add_handler(CallbackQueryHandler(handle_users_reply))
