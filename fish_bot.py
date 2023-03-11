@@ -1,18 +1,13 @@
-import environs
-import requests
 import argparse
-from pprint import pprint
-import os
-import logging
-import redis
-
 from textwrap import dedent
-from telegram import ParseMode
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Filters, Updater
-from telegram.ext import CallbackQueryHandler, CommandHandler, MessageHandler
+
+import environs
+import redis
+import requests
 from more_itertools import chunked
-from functools import partial
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, ParseMode
+from telegram.ext import (CallbackQueryHandler, CommandHandler, Filters,
+                          MessageHandler, Updater)
 
 _database = None
 
@@ -21,7 +16,8 @@ def check_token(access_token):
     headers = {
             'Authorization': f'Bearer {access_token}',
         }
-    response = requests.get('https://api.moltin.com/pcm/products', headers=headers)
+    response = requests.get('https://api.moltin.com/pcm/products',
+                            headers=headers)
     return response
 
 
@@ -34,7 +30,8 @@ def get_token():
         'client_secret': client_secret,
         'grant_type': 'client_credentials',
     }
-    response = requests.post('https://api.moltin.com/oauth/access_token', data=data)
+    response = requests.post('https://api.moltin.com/oauth/access_token',
+                             data=data)
     access_token = response.json()['access_token']
     return access_token
 
@@ -43,7 +40,8 @@ def get_products_params(access_token):
     headers = {
             'Authorization': f'Bearer {access_token}',
         }
-    response = requests.get('https://api.moltin.com/pcm/products', headers=headers)
+    response = requests.get('https://api.moltin.com/pcm/products',
+                            headers=headers)
     return response.json()
 
 
@@ -73,7 +71,8 @@ def get_product_files(access_token, file_id):
     headers = {
             'Authorization': f'Bearer {access_token}',
         }
-    response = requests.get(f'https://api.moltin.com/v2/files/{file_id}', headers=headers)
+    response = requests.get(f'https://api.moltin.com/v2/files/{file_id}',
+                            headers=headers)
     return response.json()
 
 
@@ -90,12 +89,15 @@ def create_client(access_token, client_name, email):
             'email': email,
         },
     }
-    response = requests.post('https://api.moltin.com/v2/customers', headers=headers, json=json_data)
+    response = requests.post('https://api.moltin.com/v2/customers',
+                             headers=headers,
+                             json=json_data)
     return response
 
 
 def get_products_names(products_params):
-    keyboard_products = [InlineKeyboardButton("Главное меню", callback_data='main_menu')]
+    keyboard_products = [InlineKeyboardButton("Главное меню",
+                                              callback_data='main_menu')]
     for product in products_params['data']:
         button_name = product['attributes']['name']
         button_id = product['id']
@@ -211,7 +213,6 @@ def send_product_description(update, context):
         return "PRODUCT"
 
 
-
 def add_product_to_cart(update, context):
     query = update.callback_query
     tg_id = context.user_data['tg_id']
@@ -233,7 +234,9 @@ def add_product_to_cart(update, context):
             "quantity": product_quantity,
         }
     }
-    response = requests.post(f'https://api.moltin.com/v2/carts/{tg_id}/items', headers=headers, json=json_data)
+    response = requests.post(f'https://api.moltin.com/v2/carts/{tg_id}/items',
+                             headers=headers,
+                             json=json_data)
 
     if response.ok:
         product_name = context.user_data['product_name']
@@ -277,13 +280,14 @@ def show_cart(update, context):
     headers = {
             'Authorization': f'Bearer {access_token}',
         }
-    response = requests.get(f'https://api.moltin.com/v2/carts/{tg_id}/items', headers=headers)
+    response = requests.get(f'https://api.moltin.com/v2/carts/{tg_id}/items',
+                            headers=headers)
     products_in_cart_params = response.json()
 
     products_in_cart_list = [
-        f'{count + 1}. {product["name"]}\n' \
-        f'ЦЕНА ЗА ЕДИНИЦУ: {"%.2f" % (product["unit_price"]["amount"]/100)} {product["unit_price"]["currency"]} \n' \
-        f'КОЛИЧЕСТВО: {product["quantity"]} кг \n' \
+        f'{count + 1}. {product["name"]}\n'\
+        f'ЦЕНА ЗА ЕДИНИЦУ: {"%.2f" % (product["unit_price"]["amount"]/100)} {product["unit_price"]["currency"]} \n'\
+        f'КОЛИЧЕСТВО: {product["quantity"]} кг \n'\
         f'СУММА: {"%.2f" % (product["value"]["amount"]/100)} {product["value"]["currency"]}\n\n'
         for count, product in enumerate(products_in_cart_params['data'])
     ]
@@ -291,7 +295,8 @@ def show_cart(update, context):
     headers = {
         'Authorization': f'Bearer {access_token}',
     }
-    response = requests.get(f'https://api.moltin.com/v2/carts/{tg_id}', headers=headers)
+    response = requests.get(f'https://api.moltin.com/v2/carts/{tg_id}',
+                            headers=headers)
     cart_params = response.json()
     cart_sum = f'ИТОГО {cart_params["data"]["meta"]["display_price"]["with_tax"]["formatted"]}'
     context.user_data['cart_sum'] = cart_sum
@@ -306,7 +311,8 @@ def show_cart(update, context):
     for product in products_in_cart_params['data']:
         button_name = f'Убрать из корзины {product["name"]}'
         button_id = product['id']
-        button = [InlineKeyboardButton(button_name, callback_data=f'delete {button_id}')]
+        button = [InlineKeyboardButton(button_name,
+                                       callback_data=f'delete {button_id}')]
         keyboard.insert(0, button)
     reply_markup = InlineKeyboardMarkup(keyboard)
 
@@ -328,7 +334,8 @@ def delete_product_from_cart(update, context):
     headers = {
         'Authorization': f'Bearer {access_token}',
     }
-    requests.delete(f'https://api.moltin.com/v2/carts/{tg_id}/items/{product_id}', headers=headers)
+    requests.delete(f'https://api.moltin.com/v2/carts/{tg_id}/items/{product_id}',
+                    headers=headers)
 
     return show_cart(update, context)
 
@@ -337,9 +344,11 @@ def ask_email(update, context):
     query = update.callback_query
     cart_sum = context.user_data['cart_sum']
     paiment_message = f'Сумма заказа составляет {cart_sum}\n'\
-                      f'Напишите ваш емейл. С вами свяжется наш специалист для уточнения вопроса оплаты'
+                      f'Напишите ваш емейл. ' \
+                      f'С вами свяжется наш специалист для уточнения вопроса оплаты'
 
-    keyboard = [[InlineKeyboardButton("Назад к корзине", callback_data='back_to_cart')]]
+    keyboard = [[InlineKeyboardButton("Назад к корзине",
+                                      callback_data='back_to_cart')]]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     context.bot.edit_message_text(
@@ -359,7 +368,8 @@ def get_email(update, context):
     access_token = context.user_data['access_token']
 
     email = update.message.text
-    keyboard = [[InlineKeyboardButton("Назад к корзине", callback_data='back_to_cart')]]
+    keyboard = [[InlineKeyboardButton("Назад к корзине",
+                                      callback_data='back_to_cart')]]
     reply_markup = InlineKeyboardMarkup(keyboard)
     user_fullname = str(update.message.from_user['first_name']) + ' ' + str(
         update.message.from_user['last_name'])
@@ -371,14 +381,15 @@ def get_email(update, context):
     if response.ok:
         context.bot.send_message(
             chat_id=update.effective_chat.id,
-            text=f'Вы нам прислали {email}\nВ ближайшее время с вами свяжется наш специалист',
+            text=f'Вы нам прислали {email}\n'
+                 f'В ближайшее время с вами свяжется наш специалист',
             reply_markup=reply_markup
         )
         return 'CART'
     else:
         context.bot.send_message(
             chat_id=update.effective_chat.id,
-            text=f'Вы ввели некорректный e-mail, попробуйте еще раз',
+            text='Вы ввели некорректный e-mail, попробуйте еще раз',
             reply_markup=reply_markup
         )
 
@@ -441,8 +452,6 @@ def handle_users_reply(update, context):
         access_token = get_token()
         context.user_data['access_token'] = access_token
 
-    print(user_state)
-
     states_functions = {
         'START': start,
         'MAIN_MENU': button,
@@ -476,7 +485,6 @@ def get_database_connection():
     return _database
 
 
-
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -502,7 +510,6 @@ if __name__ == '__main__':
     products_names = get_products_names(products_params)
     dispatcher.bot_data['products_names'] = products_names
 
-    # price_list_id = '5740a00e-5988-45f7-924a-c70f7697d8d4'
     dispatcher.bot_data['products_prices'] = get_products_prices(access_token,
                                                                  price_list_id=args.price_list_id)
 
@@ -510,7 +517,6 @@ if __name__ == '__main__':
     dispatcher.add_handler(CallbackQueryHandler(handle_users_reply))
     dispatcher.add_handler(MessageHandler(Filters.text, handle_users_reply))
     updater.dispatcher.add_handler(CallbackQueryHandler(button))
-
 
     updater.start_polling()
     updater.idle()

@@ -1,25 +1,16 @@
-# Телеграм-бот и ВК-бот для викторин (вопрос/ответ)
+# Телеграм-бот рыбного магазина
 
-Это чат боты ВК и телеграм, в которые загружаются викторины и
-пользователь может проверить свои знания отвечая на вопросы.
+Это бот, привязанный к магазину на платформе [elasticpat](hhttps://euwest.cm.elasticpath.com/account).
 
-## Примеры работы ботов:
+## Пример работы бота:
 ### Телеграм бот
 
-![max example](gifs/telegram.gif)
-
-### ВК бот
-
-![max example](gifs/VK.gif)
+![max example](gifs/tg_bot.gif)
 
 
 Работу бота можно посмотреть скачав телеграм бот 
 ```
-https://t.me/Anikeev1Bot
-```
-Или написав в группу в ВК "Тестовая для Девмана"
-```
-https://vk.com/club214461314
+https://t.me/AnikeevBot
 ```
 ## Запуск:
 
@@ -27,9 +18,8 @@ https://vk.com/club214461314
 ```
 git clone <метод копирования>
 ```
-У вас будет 2 рабочих файла:
-- tg_quiz_bot.py - этот файл для работы с ТГ ботом
-- vk_quiz_bot.py - это файл для работы с ВК
+У вас будет 1 рабочий файл:
+- fish_bot.py - этот файл для работы с ТГ ботом
 
 ### 2. Устанавливаем библиотеки:
 ```
@@ -42,35 +32,56 @@ touch .env
 ```
 Для тестирования телеграм-бота добавляем токен в `.env` файл: `TG_BOT_TOKEN='токен вашего бота'`
 
-Для тестирования ВК-бота добавляем токен в `.env` файл: `VK_TOKEN='токен группы в ВК куда бот будет отправлять сообщения'`
+После регистрации на [elasticpat](hhttps://euwest.cm.elasticpath.com/account) 
+необходимо [авторизоваться](https://documentation.elasticpath.com/commerce-cloud/docs/api/basics/authentication/index.html)
+и получить ключи, которые записываем в .env:
+```pycon
+CLIENT_SECRET='....'
+CLIENT_ID='.....'
+STORE_ID='....'
+```
 
-### 4. Скачайте файл с викториной
-Можно использовать викторины, которые лежат в `quiz_questios` или скачать свои [викторины](https://dvmn.org/media/modules_dist/quiz-questions.zip)
+С помощью этих ключей получаем `ACCESS_TOKEN_BEARER`:
+```pycon
+import environs
+import requests
 
+env = environs.Env()
+env.read_env()
+
+client_id = env.str("CLIENT_ID")
+client_secret = env.str("CLIENT_SECRET")
+
+data = {
+        'client_id': client_id,
+        'client_secret': client_secret,
+        'grant_type': 'client_credentials',
+    }
+response = requests.post('https://api.moltin.com/oauth/access_token', data=data)
+access_token = response.json()['access_token']
+print(access_token)
+```
+
+### 4. Создаем магазин с товарами
+https://euwest.cm.elasticpath.com/products
 
 ### 5. Запуск
 
-```
-python tg_quiz_bot.py  
-```
-
-По умолчанию будет загружена викторина `quiz-questions/1vs1200.txt`. Если необходима другая,
-укажите это при запуске файла.
-```
-python tg_quiz_bot.py quiz-questions/1vs1500.txt
-```
-
-Для запуска бота для ВК нужно запустить `redis` на компьютере в Ubuntu
+Для запуска бота нужно запустить `redis` на компьютере в Ubuntu:
 ```pycon
 $ sudo apt upgrade
 $ sudo apt upgrade
 $ sudo apt install redis-server
 $ redis-server
 ```
-А далее стандартно запустить файл с ВК ботом
+
+Также для запуска файла необходимо передать обязательный аргумент `price_list_id` - 
+это ид вашего [прайса](https://euwest.cm.elasticpath.com/pricebooks/edit-pricebook/5740a00e-5988-45f7-924a-c70f7697d8d4#price_book) в магазине 
+
 ```
-python vk_quiz_bot.py quiz-questions/1vs1500.txt
+python fish_bot.py 5740a00e-5988-45f7-924a-...... 
 ```
+
 ## Цели проекта
 
 Код написан в учебных целях — это урок в курсе по Python и веб-разработке на сайте [Devman](https://dvmn.org).
