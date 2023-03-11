@@ -86,6 +86,23 @@ def get_products_names(products_params):
     return keyboard_products
 
 
+def create_client(access_token, client_name, email):
+    headers = {
+        'Authorization': f'Bearer {access_token}',
+        'Content-Type': 'application/json',
+    }
+
+    json_data = {
+        'data': {
+            'type': 'customer',
+            'name': client_name,
+            'email': email,
+        },
+    }
+    response = requests.post('https://api.moltin.com/v2/customers', headers=headers, json=json_data)
+    return response
+
+
 def start(update, context):
     if not update.callback_query:
         context.user_data['tg_id'] = update.message.from_user.id
@@ -252,14 +269,16 @@ def add_product_to_cart(update, context):
             return "ADD_CART"
 
 
-def show_cart(update, context, access_token):
+def show_cart(update, context):
     query = update.callback_query
 
     tg_id = context.user_data['tg_id']
 
+    access_token = context.user_data['access_token']
     check = check_token(access_token)
     if not check.ok:
         access_token = get_token()
+        context.user_data['access_token'] = access_token
 
     headers = {
             'Authorization': f'Bearer {access_token}',
@@ -281,11 +300,15 @@ def show_cart(update, context, access_token):
     response = requests.get(f'https://api.moltin.com/v2/carts/{tg_id}', headers=headers)
     cart_params = response.json()
     cart_sum = f'ИТОГО {cart_params["data"]["meta"]["display_price"]["with_tax"]["formatted"]}'
+    context.user_data['cart_sum'] = cart_sum
     products_in_cart_list.append(cart_sum)
 
     products_in_cart = ' '.join(products_in_cart_list)
 
-    keyboard = [[InlineKeyboardButton("Главное меню", callback_data='main_menu')]]
+    keyboard = [
+        [InlineKeyboardButton("Оплатить", callback_data='paiment')],
+        [InlineKeyboardButton("Главное меню", callback_data='main_menu')]
+    ]
     for product in products_in_cart_params['data']:
         button_name = f'Убрать из корзины {product["name"]}'
         button_id = product['id']
@@ -316,7 +339,57 @@ def delete_product_from_cart(update, context, access_token):
     }
     requests.delete(f'https://api.moltin.com/v2/carts/{tg_id}/items/{product_id}', headers=headers)
 
-    return show_cart(update, context, access_token)
+    return show_cart(update, context)
+
+
+def ask_email(update, context):
+    query = update.callback_query
+    cart_sum = context.user_data['cart_sum']
+    paiment_message = f'Сумма заказа составляет {cart_sum}\n'\
+                      f'Напишите ваш емейл. С вами свяжется наш специалист для уточнения вопроса оплаты'
+
+    keyboard = [[InlineKeyboardButton("Назад к корзине", callback_data='back_to_cart')]]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    context.bot.edit_message_text(
+        text=paiment_message,
+        chat_id=query.message.chat_id,
+        message_id=query.message.message_id,
+        parse_mode=ParseMode.HTML,
+        reply_markup=reply_markup)
+    return 'EMAIL'
+
+
+def get_email(update, context):
+    query = update.callback_query
+    if query and query.data == 'back_to_cart':
+        return show_cart(update, context)
+
+    access_token = context.user_data['access_token']
+
+    email = update.message.text
+    keyboard = [[InlineKeyboardButton("Назад к корзине", callback_data='back_to_cart')]]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    user_fullname = str(update.message.from_user['first_name']) + ' ' + str(
+        update.message.from_user['last_name'])
+    response = create_client(
+        access_token=access_token,
+        client_name=user_fullname,
+        email=email
+    )
+    if response.ok:
+        context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text=f'Вы нам прислали {email}\nВ ближайшее время с вами свяжется наш специалист',
+            reply_markup=reply_markup
+        )
+        return 'CART'
+    else:
+        context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text=f'Вы ввели некорректный e-mail, попробуйте еще раз',
+            reply_markup=reply_markup
+        )
 
 
 def button(update, context):
@@ -327,7 +400,7 @@ def button(update, context):
         return send_products_keyboard(update, context, products_names)
 
     elif query.data == 'cart':
-        return show_cart(update, context, access_token)
+        return show_cart(update, context)
 
     elif query.data == 'main_menu':
         return start(update, context)
@@ -337,6 +410,9 @@ def button(update, context):
         send_products_keyboard(update, context, products_names)
         return "DESCRIPTION"
 
+    elif query.data == 'back_to_cart':
+        return show_cart(update, context)
+
     elif query.data == '1kg' or query.data == '5kg' or query.data == '10kg':
         context.user_data['product_quantity'] = int(query.data.replace('kg', ''))
         return add_product_to_cart(update, context)
@@ -345,6 +421,9 @@ def button(update, context):
         product_id = query.data.replace('delete ', '')
         context.user_data['delete_product_id'] = product_id
         return delete_product_from_cart(update, context, access_token)
+
+    elif 'paiment' in query.data:
+        return ask_email(update, context)
 
     else:
         return send_product_description(update, context, access_token)
@@ -362,8 +441,16 @@ def handle_users_reply(update, context):
         return
     if user_reply == '/start':
         user_state = 'START'
+        access_token = get_token()
+        context.user_data['access_token'] = access_token
     else:
         user_state = db.get(chat_id)
+
+    access_token = context.user_data['access_token']
+    check = check_token(access_token)
+    if not check.ok:
+        access_token = get_token()
+        context.user_data['access_token'] = access_token
 
     print(user_state)
 
@@ -375,6 +462,8 @@ def handle_users_reply(update, context):
         'CART': button,
         "DESCRIPTION": button,
         "ADD_CART": button,
+        'EMAIL': get_email,
+        'PHONE': button,
     }
     state_handler = states_functions[user_state]
     try:

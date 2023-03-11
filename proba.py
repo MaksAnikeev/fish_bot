@@ -28,7 +28,7 @@ env.read_env()
 # access_token = response.json()['access_token']
 # print(access_token)
 
-access_token = 'f2ae30e1c2acfc4cd756259bc8c425dfa8efc078'
+access_token = '728ef0a88526d0d996a82ed1039c4514e0144dfd'
 
 # headers = {
 #     'Authorization': f'Bearer {access_token}',
@@ -48,9 +48,12 @@ access_token = 'f2ae30e1c2acfc4cd756259bc8c425dfa8efc078'
 headers = {
     'Authorization': f'Bearer {access_token}',
 }
-
-response = requests.delete('https://api.moltin.com/v2/carts/704859099', headers=headers)
-
-print(response)
+#
+# response = requests.delete('https://api.moltin.com/v2/carts/704859099', headers=headers)
+#
+# print(response)
 
 # 704859099
+
+response = requests.get('https://api.moltin.com/v2/customers', headers=headers)
+pprint(response.json())
