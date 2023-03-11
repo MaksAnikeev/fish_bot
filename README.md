@@ -62,6 +62,18 @@ access_token = response.json()['access_token']
 print(access_token)
 ```
 
+Записываем в .env:
+```pycon
+ACCESS_TOKEN_BEARER='ea6d47d7b55336cd5d32537e2.....'
+```
+
+Для работы `redis`, в .env записываем:
+```pycon
+DATABASE_PASSWORD=''
+DATABASE_HOST='localhost'
+DATABASE_PORT=6379
+```
+
 ### 4. Создаем магазин с товарами
 https://euwest.cm.elasticpath.com/products
 
