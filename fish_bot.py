@@ -1,5 +1,6 @@
 import environs
 import requests
+import argparse
 from pprint import pprint
 import os
 import logging
@@ -76,16 +77,6 @@ def get_product_files(access_token, file_id):
     return response.json()
 
 
-def get_products_names(products_params):
-    keyboard_products = [InlineKeyboardButton("Главное меню", callback_data='main_menu')]
-    for product in products_params['data']:
-        button_name = product['attributes']['name']
-        button_id = product['id']
-        button = InlineKeyboardButton(button_name, callback_data=button_id)
-        keyboard_products.insert(0, button)
-    return keyboard_products
-
-
 def create_client(access_token, client_name, email):
     headers = {
         'Authorization': f'Bearer {access_token}',
@@ -101,6 +92,16 @@ def create_client(access_token, client_name, email):
     }
     response = requests.post('https://api.moltin.com/v2/customers', headers=headers, json=json_data)
     return response
+
+
+def get_products_names(products_params):
+    keyboard_products = [InlineKeyboardButton("Главное меню", callback_data='main_menu')]
+    for product in products_params['data']:
+        button_name = product['attributes']['name']
+        button_id = product['id']
+        button = InlineKeyboardButton(button_name, callback_data=button_id)
+        keyboard_products.insert(0, button)
+    return keyboard_products
 
 
 def start(update, context):
@@ -123,8 +124,9 @@ def start(update, context):
         return 'MAIN_MENU'
 
 
-def send_products_keyboard(update, context, products_names):
+def send_products_keyboard(update, context):
     query = update.callback_query
+    products_names = dispatcher.bot_data['products_names']
     keyboard = list(chunked(products_names, 2))
     reply_markup = InlineKeyboardMarkup(keyboard)
     try:
@@ -148,7 +150,7 @@ def send_products_keyboard(update, context, products_names):
         return "STORE"
 
 
-def send_product_description(update, context, access_token):
+def send_product_description(update, context):
     query = update.callback_query
     keyboard = [[InlineKeyboardButton("1кг", callback_data='1kg'),
                  InlineKeyboardButton("5кг", callback_data='5kg'),
@@ -159,11 +161,7 @@ def send_product_description(update, context, access_token):
     product_id = query.data
     context.user_data['product_id'] = product_id
 
-    check = check_token(access_token)
-    if not check.ok:
-        access_token = get_token()
-    context.user_data['access_token'] = access_token
-
+    access_token = context.user_data['access_token']
     product_params = get_product_params(access_token, product_id)
     product_name = product_params['data']['attributes']['name']
     product_description = product_params['data']['attributes']['description']
@@ -186,6 +184,7 @@ def send_product_description(update, context, access_token):
                             """).replace("    ", "")
     try:
         product_file_id = product_params['data']['relationships']['main_image']['data']['id']
+        access_token = context.user_data['access_token']
         product_image_params = get_product_files(access_token,
                                                  file_id=product_file_id)
         product_image_url = product_image_params['data']['link']['href']
@@ -273,12 +272,7 @@ def show_cart(update, context):
     query = update.callback_query
 
     tg_id = context.user_data['tg_id']
-
     access_token = context.user_data['access_token']
-    check = check_token(access_token)
-    if not check.ok:
-        access_token = get_token()
-        context.user_data['access_token'] = access_token
 
     headers = {
             'Authorization': f'Bearer {access_token}',
@@ -326,12 +320,9 @@ def show_cart(update, context):
     return 'CART'
 
 
-def delete_product_from_cart(update, context, access_token):
+def delete_product_from_cart(update, context):
     product_id = context.user_data['delete_product_id']
-    check = check_token(access_token)
-    if not check.ok:
-        access_token = get_token()
-
+    access_token = context.user_data['access_token']
     tg_id = context.user_data['tg_id']
 
     headers = {
@@ -396,8 +387,7 @@ def button(update, context):
     query = update.callback_query
 
     if query.data == 'store':
-        products_names = dispatcher.bot_data['products_names']
-        return send_products_keyboard(update, context, products_names)
+        return send_products_keyboard(update, context)
 
     elif query.data == 'cart':
         return show_cart(update, context)
@@ -406,8 +396,7 @@ def button(update, context):
         return start(update, context)
 
     elif query.data == 'back':
-        products_names = dispatcher.bot_data['products_names']
-        send_products_keyboard(update, context, products_names)
+        send_products_keyboard(update, context)
         return "DESCRIPTION"
 
     elif query.data == 'back_to_cart':
@@ -420,13 +409,13 @@ def button(update, context):
     elif 'delete' in query.data:
         product_id = query.data.replace('delete ', '')
         context.user_data['delete_product_id'] = product_id
-        return delete_product_from_cart(update, context, access_token)
+        return delete_product_from_cart(update, context)
 
     elif 'paiment' in query.data:
         return ask_email(update, context)
 
     else:
-        return send_product_description(update, context, access_token)
+        return send_product_description(update, context)
 
 
 def handle_users_reply(update, context):
@@ -489,6 +478,14 @@ def get_database_connection():
 
 
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        'price_list_id',
+        type=str,
+        help='ИД прайс листа в elasticpath',
+    )
+    args = parser.parse_args()
+
     env = environs.Env()
     env.read_env()
 
@@ -505,8 +502,9 @@ if __name__ == '__main__':
     products_names = get_products_names(products_params)
     dispatcher.bot_data['products_names'] = products_names
 
-    price_list_id = '5740a00e-5988-45f7-924a-c70f7697d8d4'
-    dispatcher.bot_data['products_prices'] = get_products_prices(access_token, price_list_id)
+    # price_list_id = '5740a00e-5988-45f7-924a-c70f7697d8d4'
+    dispatcher.bot_data['products_prices'] = get_products_prices(access_token,
+                                                                 price_list_id=args.price_list_id)
 
     dispatcher.add_handler(CommandHandler('start', handle_users_reply))
     dispatcher.add_handler(CallbackQueryHandler(handle_users_reply))
