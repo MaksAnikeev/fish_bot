@@ -138,7 +138,7 @@ def send_products_keyboard(update, context):
             message_id=query.message.message_id,
             reply_markup=reply_markup
         )
-        return "STORE"
+        return "PRODUCT"
     except:
         context.bot.delete_message(
             chat_id=query.message.chat_id,
@@ -149,11 +149,14 @@ def send_products_keyboard(update, context):
             chat_id=query.message.chat_id,
             reply_markup=reply_markup
         )
-        return "STORE"
+        return "PRODUCT"
 
 
 def send_product_description(update, context):
     query = update.callback_query
+    if query.data == 'main_menu':
+        return start(update, context)
+
     keyboard = [[InlineKeyboardButton("1кг", callback_data='1kg'),
                  InlineKeyboardButton("5кг", callback_data='5kg'),
                  InlineKeyboardButton("10кг", callback_data='10kg')],
@@ -201,7 +204,7 @@ def send_product_description(update, context):
             caption=product_message,
             reply_markup=reply_markup,
             parse_mode=ParseMode.HTML)
-        return "PRODUCT"
+        return "ADD_CART"
 
     except:
         context.bot.edit_message_text(
@@ -210,15 +213,18 @@ def send_product_description(update, context):
             message_id=query.message.message_id,
             reply_markup=reply_markup,
             parse_mode=ParseMode.HTML)
-        return "PRODUCT"
+        return "ADD_CART"
 
 
 def add_product_to_cart(update, context):
     query = update.callback_query
+    if query.data == 'back':
+        return send_products_keyboard(update, context)
+
     tg_id = context.user_data['tg_id']
     access_token = context.user_data['access_token']
     product_id = context.user_data['product_id']
-    product_quantity = context.user_data['product_quantity']
+    product_quantity = int(query.data.replace('kg', ''))
 
     keyboard = [[InlineKeyboardButton("Назад", callback_data='back')]]
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -256,7 +262,7 @@ def add_product_to_cart(update, context):
                 reply_markup=reply_markup,
                 parse_mode=ParseMode.HTML
             )
-            return "ADD_CART"
+            return "STORE"
         except:
             context.bot.delete_message(
                 chat_id=query.message.chat_id,
@@ -268,7 +274,7 @@ def add_product_to_cart(update, context):
                 reply_markup=reply_markup,
                 parse_mode=ParseMode.HTML
             )
-            return "ADD_CART"
+            return "STORE"
 
 
 def show_cart(update, context):
@@ -357,7 +363,7 @@ def ask_email(update, context):
         message_id=query.message.message_id,
         parse_mode=ParseMode.HTML,
         reply_markup=reply_markup)
-    return 'EMAIL'
+    return 'GET_EMAIL'
 
 
 def get_email(update, context):
@@ -406,16 +412,8 @@ def button(update, context):
     elif query.data == 'main_menu':
         return start(update, context)
 
-    elif query.data == 'back':
-        send_products_keyboard(update, context)
-        return "DESCRIPTION"
-
     elif query.data == 'back_to_cart':
         return show_cart(update, context)
-
-    elif query.data == '1kg' or query.data == '5kg' or query.data == '10kg':
-        context.user_data['product_quantity'] = int(query.data.replace('kg', ''))
-        return add_product_to_cart(update, context)
 
     elif 'delete' in query.data:
         product_id = query.data.replace('delete ', '')
@@ -424,9 +422,6 @@ def button(update, context):
 
     elif 'paiment' in query.data:
         return ask_email(update, context)
-
-    else:
-        return send_product_description(update, context)
 
 
 def handle_users_reply(update, context):
@@ -455,13 +450,11 @@ def handle_users_reply(update, context):
     states_functions = {
         'START': start,
         'MAIN_MENU': button,
-        'STORE': button,
-        "PRODUCT": button,
+        'STORE': send_products_keyboard,
+        "PRODUCT": send_product_description,
         'CART': button,
-        "DESCRIPTION": button,
-        "ADD_CART": button,
-        'EMAIL': get_email,
-        'PHONE': button,
+        "ADD_CART": add_product_to_cart,
+        'GET_EMAIL': get_email,
     }
     state_handler = states_functions[user_state]
     try:
