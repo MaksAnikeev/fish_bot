@@ -26,6 +26,7 @@ def get_token():
     }
     response = requests.post('https://api.moltin.com/oauth/access_token',
                              data=data)
+    response.raise_for_status()
     access_token = response.json()['access_token']
     return access_token
 
@@ -36,6 +37,7 @@ def get_products_params(access_token):
         }
     response = requests.get('https://api.moltin.com/pcm/products',
                             headers=headers)
+    response.raise_for_status()
     return response.json()
 
 
@@ -49,6 +51,7 @@ def get_product_params(access_token, product_id):
     response = requests.get(f'https://api.moltin.com/pcm/products/{product_id}',
                             headers=headers,
                             params=params)
+    response.raise_for_status()
     return response.json()
 
 
@@ -58,6 +61,7 @@ def get_products_prices(access_token, price_list_id):
         }
     response = requests.get(f'https://api.moltin.com/pcm/pricebooks/{price_list_id}/prices',
                             headers=headers)
+    response.raise_for_status()
     return response.json()
 
 
@@ -67,6 +71,7 @@ def get_product_files(access_token, file_id):
         }
     response = requests.get(f'https://api.moltin.com/v2/files/{file_id}',
                             headers=headers)
+    response.raise_for_status()
     return response.json()
 
 
@@ -86,6 +91,7 @@ def create_client(access_token, client_name, email):
     response = requests.post('https://api.moltin.com/v2/customers',
                              headers=headers,
                              json=json_data)
+    response.raise_for_status()
     return response
 
 

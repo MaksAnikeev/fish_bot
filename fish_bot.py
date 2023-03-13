@@ -214,6 +214,7 @@ def show_cart(update, context):
     }
     response = requests.get(f'https://api.moltin.com/v2/carts/{tg_id}',
                             headers=headers)
+    response.raise_for_status()
     cart_params = response.json()
     cart_sum = f'ИТОГО {cart_params["data"]["meta"]["display_price"]["with_tax"]["formatted"]}'
     context.user_data['cart_sum'] = cart_sum
