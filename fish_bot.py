@@ -204,13 +204,14 @@ def show_cart(update, context):
                             headers=headers)
     products_in_cart_params = response.json()
 
-    products_in_cart_list = [
-        f'{count + 1}. {product["name"]}\n'\
-        f'ЦЕНА ЗА ЕДИНИЦУ: {"%.2f" % (product["unit_price"]["amount"]/100)} {product["unit_price"]["currency"]} \n'\
-        f'КОЛИЧЕСТВО: {product["quantity"]} кг \n'\
-        f'СУММА: {"%.2f" % (product["value"]["amount"]/100)} {product["value"]["currency"]}\n\n'
+    products_in_cart_list = [dedent(f'''
+        {count + 1}. {product["name"]}
+        ЦЕНА ЗА ЕДИНИЦУ: {"%.2f" % (product["unit_price"]["amount"]/100)} {product["unit_price"]["currency"]}
+        КОЛИЧЕСТВО: {product["quantity"]} кг
+        СУММА: {"%.2f" % (product["value"]["amount"]/100)} {product["value"]["currency"]}
+        ''').replace("    ", "")
         for count, product in enumerate(products_in_cart_params['data'])
-    ]
+        ]
 
     headers = {
         'Authorization': f'Bearer {access_token}',
@@ -219,7 +220,9 @@ def show_cart(update, context):
                             headers=headers)
     response.raise_for_status()
     cart_params = response.json()
-    cart_sum = f'ИТОГО {cart_params["data"]["meta"]["display_price"]["with_tax"]["formatted"]}'
+    cart_sum = dedent(f'''
+            ИТОГО {cart_params["data"]["meta"]["display_price"]["with_tax"]["formatted"]}
+            ''').replace("    ", "")
     context.user_data['cart_sum'] = cart_sum
     products_in_cart_list.append(cart_sum)
 
