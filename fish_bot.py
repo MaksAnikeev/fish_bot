@@ -51,14 +51,15 @@ def send_products_keyboard(update, context):
         )
         return "PRODUCT"
     except:
-        context.bot.delete_message(
-            chat_id=query.message.chat_id,
-            message_id=query.message.message_id
-        )
         context.bot.send_message(
             text='Выбери товар из магазина:',
             chat_id=query.message.chat_id,
             reply_markup=reply_markup
+        )
+
+        context.bot.delete_message(
+            chat_id=query.message.chat_id,
+            message_id=query.message.message_id
         )
         return "PRODUCT"
 
@@ -106,15 +107,16 @@ def send_product_description(update, context):
         product_image_url = product_image_params['data']['link']['href']
         product_image = requests.get(product_image_url)
 
-        context.bot.delete_message(
-            chat_id=query.message.chat_id,
-            message_id=query.message.message_id
-        )
         query.message.reply_photo(
             product_image.content,
             caption=product_message,
             reply_markup=reply_markup,
             parse_mode=ParseMode.HTML)
+
+        context.bot.delete_message(
+            chat_id=query.message.chat_id,
+            message_id=query.message.message_id
+        )
         return "ADD_CART"
 
     except:
@@ -175,15 +177,16 @@ def add_product_to_cart(update, context):
             )
             return "STORE"
         except:
-            context.bot.delete_message(
-                chat_id=query.message.chat_id,
-                message_id=query.message.message_id
-            )
             context.bot.send_message(
                 text=add_cart_message,
                 chat_id=query.message.chat_id,
                 reply_markup=reply_markup,
                 parse_mode=ParseMode.HTML
+            )
+
+            context.bot.delete_message(
+                chat_id=query.message.chat_id,
+                message_id=query.message.message_id
             )
             return "STORE"
 
