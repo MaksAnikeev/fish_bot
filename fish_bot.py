@@ -11,7 +11,8 @@ from telegram.ext import (CallbackQueryHandler, CommandHandler, Filters,
 
 from moltin import (check_token, get_token, get_product_params,
                     get_products_prices, get_product_files, create_client,
-                    get_products_names, get_products_params)
+                    get_products_names, get_products_params, add_item_to_cart,
+                    get_products_from_cart, get_cart_params, delete_item_from_cart)
 
 
 _database = None
@@ -142,20 +143,10 @@ def add_product_to_cart(update, context):
     keyboard = [[InlineKeyboardButton("Назад", callback_data='back')]]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
-    headers = {
-        'Authorization': f'Bearer {access_token}',
-        'Content-Type': 'application/json'
-    }
-    json_data = {
-        'data': {
-            'type': 'cart_item',
-            'id': product_id,
-            "quantity": product_quantity,
-        }
-    }
-    response = requests.post(f'https://api.moltin.com/v2/carts/{tg_id}/items',
-                             headers=headers,
-                             json=json_data)
+    response = add_item_to_cart(access_token=access_token,
+                                product_id=product_id,
+                                quantity=product_quantity,
+                                cart_name=tg_id)
 
     if response.ok:
         product_name = context.user_data['product_name']
@@ -197,12 +188,8 @@ def show_cart(update, context):
     tg_id = context.user_data['tg_id']
     access_token = context.user_data['access_token']
 
-    headers = {
-            'Authorization': f'Bearer {access_token}',
-        }
-    response = requests.get(f'https://api.moltin.com/v2/carts/{tg_id}/items',
-                            headers=headers)
-    products_in_cart_params = response.json()
+    products_in_cart_params = get_products_from_cart(access_token=access_token,
+                                                     cart_name=tg_id)
 
     products_in_cart_list = [dedent(f'''
         {count + 1}. {product["name"]}
@@ -213,13 +200,8 @@ def show_cart(update, context):
         for count, product in enumerate(products_in_cart_params['data'])
         ]
 
-    headers = {
-        'Authorization': f'Bearer {access_token}',
-    }
-    response = requests.get(f'https://api.moltin.com/v2/carts/{tg_id}',
-                            headers=headers)
-    response.raise_for_status()
-    cart_params = response.json()
+    cart_params = get_cart_params(access_token=access_token,
+                                  cart_name=tg_id)
     cart_sum = dedent(f'''
             ИТОГО {cart_params["data"]["meta"]["display_price"]["with_tax"]["formatted"]}
             ''').replace("    ", "")
@@ -255,11 +237,9 @@ def delete_product_from_cart(update, context):
     access_token = context.user_data['access_token']
     tg_id = context.user_data['tg_id']
 
-    headers = {
-        'Authorization': f'Bearer {access_token}',
-    }
-    requests.delete(f'https://api.moltin.com/v2/carts/{tg_id}/items/{product_id}',
-                    headers=headers)
+    delete_item_from_cart(access_token=access_token,
+                       cart_name=tg_id,
+                       product_id=product_id)
 
     return show_cart(update, context)
 

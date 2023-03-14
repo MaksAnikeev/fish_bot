@@ -104,3 +104,52 @@ def get_products_names(products_params):
         button = InlineKeyboardButton(button_name, callback_data=button_id)
         keyboard_products.insert(0, button)
     return keyboard_products
+
+
+def add_item_to_cart(access_token, product_id, quantity, cart_name):
+    headers = {
+        'Authorization': f'Bearer {access_token}',
+        'Content-Type': 'application/json'
+    }
+    json_data = {
+        'data': {
+            'type': 'cart_item',
+            'id': product_id,
+            "quantity": quantity,
+        }
+    }
+    response = requests.post(f'https://api.moltin.com/v2/carts/{cart_name}/items',
+                             headers=headers,
+                             json=json_data)
+    response.raise_for_status()
+    return response
+
+
+def get_products_from_cart(access_token, cart_name):
+    headers = {
+            'Authorization': f'Bearer {access_token}',
+        }
+    response = requests.get(f'https://api.moltin.com/v2/carts/{cart_name}/items',
+                            headers=headers)
+    response.raise_for_status()
+    return response.json()
+
+
+def get_cart_params(access_token, cart_name):
+    headers = {
+        'Authorization': f'Bearer {access_token}',
+    }
+    response = requests.get(f'https://api.moltin.com/v2/carts/{cart_name}',
+                            headers=headers)
+    response.raise_for_status()
+    return response.json()
+
+
+def delete_item_from_cart(access_token, cart_name, product_id):
+    headers = {
+        'Authorization': f'Bearer {access_token}',
+    }
+    response = requests.delete(f'https://api.moltin.com/v2/carts/{cart_name}/items/{product_id}',
+                    headers=headers)
+    response.raise_for_status()
+    return response
