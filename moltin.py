@@ -6,14 +6,6 @@ from telegram import InlineKeyboardButton
 env = environs.Env()
 env.read_env()
 
-def check_token(access_token):
-    headers = {
-            'Authorization': f'Bearer {access_token}',
-        }
-    response = requests.get('https://api.moltin.com/pcm/products',
-                            headers=headers)
-    return response
-
 
 def get_token():
     client_id = env.str("CLIENT_ID")
@@ -28,7 +20,8 @@ def get_token():
                              data=data)
     response.raise_for_status()
     access_token = response.json()['access_token']
-    return access_token
+    token_expires = response.json()['expires']
+    return access_token, token_expires
 
 
 def get_products_params(access_token):
@@ -91,7 +84,6 @@ def create_client(access_token, client_name, email):
     response = requests.post('https://api.moltin.com/v2/customers',
                              headers=headers,
                              json=json_data)
-    response.raise_for_status()
     return response
 
 

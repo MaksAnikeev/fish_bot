@@ -4,18 +4,26 @@ from textwrap import dedent
 import environs
 import redis
 import requests
+from datetime import datetime
 from more_itertools import chunked
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, ParseMode
 from telegram.ext import (CallbackQueryHandler, CommandHandler, Filters,
                           MessageHandler, Updater)
 
-from moltin import (check_token, get_token, get_product_params,
+from moltin import (get_token, get_product_params,
                     get_products_prices, get_product_files, create_client,
                     get_products_names, get_products_params, add_item_to_cart,
                     get_products_from_cart, get_cart_params, delete_item_from_cart)
 
 
 _database = None
+
+
+def check_token(token_expires):
+    timestamp_now = datetime.now().timestamp()
+    delta = token_expires - timestamp_now
+    if delta > 0:
+        return "OK"
 
 
 def start(update, context):
@@ -298,7 +306,7 @@ def get_email(update, context):
         )
 
 
-def button(update, context):
+def handle_button(update, context):
     query = update.callback_query
 
     if query.data == 'store':
@@ -334,23 +342,24 @@ def handle_users_reply(update, context):
         return
     if user_reply == '/start':
         user_state = 'START'
-        access_token = get_token()
+        access_token, token_expires = get_token()
         context.user_data['access_token'] = access_token
+        context.user_data['token_expires'] = token_expires
     else:
         user_state = db.get(chat_id)
 
-    access_token = context.user_data['access_token']
-    check = check_token(access_token)
-    if not check.ok:
-        access_token = get_token()
+    token_expires = context.user_data['token_expires']
+    if not check_token(token_expires) == "OK":
+        access_token, token_expires = get_token()
         context.user_data['access_token'] = access_token
+        context.user_data['token_expires'] = token_expires
 
     states_functions = {
         'START': start,
-        'MAIN_MENU': button,
+        'MAIN_MENU': handle_button,
         'STORE': send_products_keyboard,
         "PRODUCT": send_product_description,
-        'CART': button,
+        'CART': handle_button,
         "ADD_CART": add_product_to_cart,
         'GET_EMAIL': get_email,
     }
@@ -388,10 +397,7 @@ if __name__ == '__main__':
     env = environs.Env()
     env.read_env()
 
-    access_token = env.str("ACCESS_TOKEN_BEARER")
-    check = check_token(access_token)
-    if not check.ok:
-        access_token = get_token()
+    access_token, token_expires = get_token()
 
     token = env.str("TG_BOT_TOKEN")
     updater = Updater(token)
@@ -407,7 +413,7 @@ if __name__ == '__main__':
     dispatcher.add_handler(CommandHandler('start', handle_users_reply))
     dispatcher.add_handler(CallbackQueryHandler(handle_users_reply))
     dispatcher.add_handler(MessageHandler(Filters.text, handle_users_reply))
-    updater.dispatcher.add_handler(CallbackQueryHandler(button))
+    updater.dispatcher.add_handler(CallbackQueryHandler(handle_button))
 
     updater.start_polling()
     updater.idle()
