@@ -10,7 +10,7 @@
 
 Работу бота можно посмотреть скачав телеграм бот 
 ```
-https://t.me/AnikeevBot
+https://t.me/Anikeev1Bot
 ```
 ## Запуск:
 
@@ -18,7 +18,7 @@ https://t.me/AnikeevBot
 ```
 git clone <метод копирования>
 ```
-У вас будет 1 рабочий файл:
+У вас будет 2 функциональных файла:
 - fish_bot.py - этот файл для работы с ТГ ботом
 - moltin.py - это вспомогательный файл с функциями для обращения 
 к базе данных магазина на платформе elasticpat
@@ -41,32 +41,6 @@ touch .env
 CLIENT_SECRET='....'
 CLIENT_ID='.....'
 STORE_ID='....'
-```
-
-С помощью этих ключей получаем `ACCESS_TOKEN_BEARER`:
-```pycon
-import environs
-import requests
-
-env = environs.Env()
-env.read_env()
-
-client_id = env.str("CLIENT_ID")
-client_secret = env.str("CLIENT_SECRET")
-
-data = {
-        'client_id': client_id,
-        'client_secret': client_secret,
-        'grant_type': 'client_credentials',
-    }
-response = requests.post('https://api.moltin.com/oauth/access_token', data=data)
-access_token = response.json()['access_token']
-print(access_token)
-```
-
-Записываем в .env:
-```pycon
-ACCESS_TOKEN_BEARER='ea6d47d7b55336cd5d32537e2.....'
 ```
 
 Для работы `redis`, в .env записываем:
