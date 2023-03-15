@@ -48,7 +48,9 @@ def start(update, context):
 
 def send_products_keyboard(update, context):
     query = update.callback_query
-    products_names = dispatcher.bot_data['products_names']
+    access_token = context.user_data['access_token']
+    products_params = get_products_params(access_token)
+    products_names = get_products_names(products_params)
     keyboard = list(chunked(products_names, 2))
     reply_markup = InlineKeyboardMarkup(keyboard)
     try:
@@ -95,7 +97,11 @@ def send_product_description(update, context):
 
     context.user_data['product_name'] = product_name
 
-    products_prices = dispatcher.bot_data['products_prices']
+    products_prices = get_products_prices(
+        access_token,
+        price_list_id=args.price_list_id
+    )
+
     for price in products_prices['data']:
         if price['attributes']['sku'] == product_sku:
             product_price = "%.2f" % (price['attributes']['currencies']['USD']['amount']/100)
@@ -397,18 +403,9 @@ if __name__ == '__main__':
     env = environs.Env()
     env.read_env()
 
-    access_token, token_expires = get_token()
-
     token = env.str("TG_BOT_TOKEN")
     updater = Updater(token)
     dispatcher = updater.dispatcher
-
-    products_params = get_products_params(access_token)
-    products_names = get_products_names(products_params)
-    dispatcher.bot_data['products_names'] = products_names
-
-    dispatcher.bot_data['products_prices'] = get_products_prices(access_token,
-                                                                 price_list_id=args.price_list_id)
 
     dispatcher.add_handler(CommandHandler('start', handle_users_reply))
     dispatcher.add_handler(CallbackQueryHandler(handle_users_reply))
