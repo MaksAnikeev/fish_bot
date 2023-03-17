@@ -205,7 +205,7 @@ def show_cart(update, context):
     products_in_cart_params = get_products_from_cart(access_token=access_token,
                                                      cart_name=tg_id)
 
-    products_in_cart_list = [dedent(f'''
+    cart_products = [dedent(f'''
         {count + 1}. {product["name"]}
         ЦЕНА ЗА ЕДИНИЦУ: {"%.2f" % (product["unit_price"]["amount"]/100)} {product["unit_price"]["currency"]}
         КОЛИЧЕСТВО: {product["quantity"]} кг
@@ -220,9 +220,9 @@ def show_cart(update, context):
             ИТОГО {cart_params["data"]["meta"]["display_price"]["with_tax"]["formatted"]}
             ''').replace("    ", "")
     context.user_data['cart_sum'] = cart_sum
-    products_in_cart_list.append(cart_sum)
+    cart_products.append(cart_sum)
 
-    products_in_cart = ' '.join(products_in_cart_list)
+    products_in_cart = ' '.join(cart_products)
 
     keyboard = [
         [InlineKeyboardButton("Оплатить", callback_data='paiment')],
