@@ -338,6 +338,10 @@ def handle_button(update, context):
 
 def handle_users_reply(update, context):
     db = get_database_connection()
+
+    client_id = dispatcher.bot_data['client_id']
+    client_secret = dispatcher.bot_data['client_secret']
+
     if update.message:
         user_reply = update.message.text
         chat_id = update.message.chat_id
@@ -348,7 +352,7 @@ def handle_users_reply(update, context):
         return
     if user_reply == '/start':
         user_state = 'START'
-        access_token, token_expires = get_token()
+        access_token, token_expires = get_token(client_id, client_secret)
         context.user_data['access_token'] = access_token
         context.user_data['token_expires'] = token_expires
     else:
@@ -356,7 +360,7 @@ def handle_users_reply(update, context):
 
     token_expires = context.user_data['token_expires']
     if not check_token(token_expires) == "OK":
-        access_token, token_expires = get_token()
+        access_token, token_expires = get_token(client_id, client_secret)
         context.user_data['access_token'] = access_token
         context.user_data['token_expires'] = token_expires
 
@@ -392,6 +396,9 @@ def get_database_connection():
 
 
 if __name__ == '__main__':
+    env = environs.Env()
+    env.read_env()
+
     parser = argparse.ArgumentParser()
     parser.add_argument(
         'price_list_id',
@@ -400,12 +407,12 @@ if __name__ == '__main__':
     )
     args = parser.parse_args()
 
-    env = environs.Env()
-    env.read_env()
-
-    token = env.str("TG_BOT_TOKEN")
+    token = env.str("TG_BOT_TOKEN1")
     updater = Updater(token)
     dispatcher = updater.dispatcher
+
+    dispatcher.bot_data['client_id'] = env.str("CLIENT_ID")
+    dispatcher.bot_data['client_secret'] = env.str("CLIENT_SECRET")
 
     dispatcher.add_handler(CommandHandler('start', handle_users_reply))
     dispatcher.add_handler(CallbackQueryHandler(handle_users_reply))

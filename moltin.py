@@ -1,12 +1,8 @@
-import environs
 import requests
 from telegram import InlineKeyboardButton
 
 
-def get_token():
-    client_id = env.str("CLIENT_ID")
-    client_secret = env.str("CLIENT_SECRET")
-
+def get_token(client_id, client_secret):
     data = {
         'client_id': client_id,
         'client_secret': client_secret,
@@ -142,8 +138,3 @@ def delete_item_from_cart(access_token, cart_name, product_id):
                     headers=headers)
     response.raise_for_status()
     return response
-
-
-if __name__ == '__main__':
-    env = environs.Env()
-    env.read_env()
