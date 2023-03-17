@@ -19,8 +19,9 @@ def get_token():
     response = requests.post('https://api.moltin.com/oauth/access_token',
                              data=data)
     response.raise_for_status()
-    access_token = response.json()['access_token']
-    token_expires = response.json()['expires']
+    token_params = response.json()
+    access_token = token_params['access_token']
+    token_expires = token_params['expires']
     return access_token, token_expires
 
 
