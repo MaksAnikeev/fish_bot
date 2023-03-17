@@ -121,6 +121,7 @@ def send_product_description(update, context):
                                                  file_id=product_file_id)
         product_image_url = product_image_params['data']['link']['href']
         product_image = requests.get(product_image_url)
+        product_image.raise_for_status()
 
         query.message.reply_photo(
             product_image.content,
