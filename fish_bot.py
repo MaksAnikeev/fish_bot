@@ -48,7 +48,7 @@ def start(update, context):
 
 def send_products_keyboard(update, context):
     query = update.callback_query
-    access_token = context.user_data['access_token']
+    access_token = context.bot_data['access_token']
     products_params = get_products_params(access_token)
     products_names = get_products_names(products_params)
     keyboard = list(chunked(products_names, 2))
@@ -89,7 +89,7 @@ def send_product_description(update, context):
     product_id = query.data
     context.user_data['product_id'] = product_id
 
-    access_token = context.user_data['access_token']
+    access_token = context.bot_data['access_token']
     product_params = get_product_params(access_token, product_id)
     product_name = product_params['data']['attributes']['name']
     product_description = product_params['data']['attributes']['description']
@@ -116,7 +116,7 @@ def send_product_description(update, context):
                             """).replace("    ", "")
     try:
         product_file_id = product_params['data']['relationships']['main_image']['data']['id']
-        access_token = context.user_data['access_token']
+        access_token = context.bot_data['access_token']
         product_image_params = get_product_files(access_token,
                                                  file_id=product_file_id)
         product_image_url = product_image_params['data']['link']['href']
@@ -151,7 +151,7 @@ def add_product_to_cart(update, context):
         return send_products_keyboard(update, context)
 
     tg_id = context.user_data['tg_id']
-    access_token = context.user_data['access_token']
+    access_token = context.bot_data['access_token']
     product_id = context.user_data['product_id']
     product_quantity = int(query.data.replace('kg', ''))
 
@@ -201,7 +201,7 @@ def show_cart(update, context):
     query = update.callback_query
 
     tg_id = context.user_data['tg_id']
-    access_token = context.user_data['access_token']
+    access_token = context.bot_data['access_token']
 
     products_in_cart_params = get_products_from_cart(access_token=access_token,
                                                      cart_name=tg_id)
@@ -226,7 +226,7 @@ def show_cart(update, context):
     products_in_cart = ' '.join(cart_products)
 
     keyboard = [
-        [InlineKeyboardButton("Оплатить", callback_data='paiment')],
+        [InlineKeyboardButton("Оплатить", callback_data='payment')],
         [InlineKeyboardButton("Главное меню", callback_data='main_menu')]
     ]
     for product in products_in_cart_params['data']:
@@ -249,7 +249,7 @@ def show_cart(update, context):
 
 def delete_product_from_cart(update, context):
     product_id = context.user_data['delete_product_id']
-    access_token = context.user_data['access_token']
+    access_token = context.bot_data['access_token']
     tg_id = context.user_data['tg_id']
 
     delete_item_from_cart(access_token=access_token,
@@ -262,7 +262,7 @@ def delete_product_from_cart(update, context):
 def ask_email(update, context):
     query = update.callback_query
     cart_sum = context.user_data['cart_sum']
-    paiment_message = f'Сумма заказа составляет {cart_sum}\n'\
+    payment_message = f'Сумма заказа составляет {cart_sum}\n'\
                       f'Напишите ваш емейл. ' \
                       f'С вами свяжется наш специалист для уточнения вопроса оплаты'
 
@@ -271,7 +271,7 @@ def ask_email(update, context):
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     context.bot.edit_message_text(
-        text=paiment_message,
+        text=payment_message,
         chat_id=query.message.chat_id,
         message_id=query.message.message_id,
         parse_mode=ParseMode.HTML,
@@ -284,7 +284,7 @@ def get_email(update, context):
     if query and query.data == 'back_to_cart':
         return show_cart(update, context)
 
-    access_token = context.user_data['access_token']
+    access_token = context.bot_data['access_token']
 
     email = update.message.text
     keyboard = [[InlineKeyboardButton("Назад к корзине",
@@ -333,7 +333,7 @@ def handle_button(update, context):
         context.user_data['delete_product_id'] = product_id
         return delete_product_from_cart(update, context)
 
-    elif 'paiment' in query.data:
+    elif 'payment' in query.data:
         return ask_email(update, context)
 
 
@@ -354,16 +354,16 @@ def handle_users_reply(update, context):
     if user_reply == '/start':
         user_state = 'START'
         access_token, token_expires = get_token(client_id, client_secret)
-        context.user_data['access_token'] = access_token
-        context.user_data['token_expires'] = token_expires
+        context.bot_data['access_token'] = access_token
+        context.bot_data['token_expires'] = token_expires
     else:
         user_state = db.get(chat_id)
 
-    token_expires = context.user_data['token_expires']
+    token_expires = context.bot_data['token_expires']
     if not check_token(token_expires) == "OK":
         access_token, token_expires = get_token(client_id, client_secret)
-        context.user_data['access_token'] = access_token
-        context.user_data['token_expires'] = token_expires
+        context.bot_data['access_token'] = access_token
+        context.bot_data['token_expires'] = token_expires
 
     states_functions = {
         'START': start,
