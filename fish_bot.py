@@ -408,7 +408,7 @@ if __name__ == '__main__':
     )
     args = parser.parse_args()
 
-    token = env.str("TG_BOT_TOKEN1")
+    token = env.str("TG_BOT_TOKEN")
     updater = Updater(token)
     dispatcher = updater.dispatcher
 
