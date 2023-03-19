@@ -23,7 +23,7 @@ def check_token(token_expires):
     timestamp_now = datetime.now().timestamp()
     delta = token_expires - timestamp_now
     if delta > 0:
-        return "OK"
+        return True
 
 
 def start(update, context):
@@ -48,7 +48,7 @@ def start(update, context):
 
 def send_products_keyboard(update, context):
     query = update.callback_query
-    access_token = context.bot_data['access_token']
+    access_token = dispatcher.bot_data['access_token']
     products_params = get_products_params(access_token)
     products_names = get_products_names(products_params)
     keyboard = list(chunked(products_names, 2))
@@ -89,7 +89,7 @@ def send_product_description(update, context):
     product_id = query.data
     context.user_data['product_id'] = product_id
 
-    access_token = context.bot_data['access_token']
+    access_token = dispatcher.bot_data['access_token']
     product_params = get_product_params(access_token, product_id)
     product_name = product_params['data']['attributes']['name']
     product_description = product_params['data']['attributes']['description']
@@ -116,7 +116,7 @@ def send_product_description(update, context):
                             """).replace("    ", "")
     try:
         product_file_id = product_params['data']['relationships']['main_image']['data']['id']
-        access_token = context.bot_data['access_token']
+        access_token = dispatcher.bot_data['access_token']
         product_image_params = get_product_files(access_token,
                                                  file_id=product_file_id)
         product_image_url = product_image_params['data']['link']['href']
@@ -151,7 +151,7 @@ def add_product_to_cart(update, context):
         return send_products_keyboard(update, context)
 
     tg_id = context.user_data['tg_id']
-    access_token = context.bot_data['access_token']
+    access_token = dispatcher.bot_data['access_token']
     product_id = context.user_data['product_id']
     product_quantity = int(query.data.replace('kg', ''))
 
@@ -201,7 +201,7 @@ def show_cart(update, context):
     query = update.callback_query
 
     tg_id = context.user_data['tg_id']
-    access_token = context.bot_data['access_token']
+    access_token = dispatcher.bot_data['access_token']
 
     products_in_cart_params = get_products_from_cart(access_token=access_token,
                                                      cart_name=tg_id)
@@ -249,7 +249,7 @@ def show_cart(update, context):
 
 def delete_product_from_cart(update, context):
     product_id = context.user_data['delete_product_id']
-    access_token = context.bot_data['access_token']
+    access_token = dispatcher.bot_data['access_token']
     tg_id = context.user_data['tg_id']
 
     delete_item_from_cart(access_token=access_token,
@@ -284,7 +284,7 @@ def get_email(update, context):
     if query and query.data == 'back_to_cart':
         return show_cart(update, context)
 
-    access_token = context.bot_data['access_token']
+    access_token = dispatcher.bot_data['access_token']
 
     email = update.message.text
     keyboard = [[InlineKeyboardButton("Назад к корзине",
@@ -340,9 +340,6 @@ def handle_button(update, context):
 def handle_users_reply(update, context):
     db = get_database_connection()
 
-    client_id = dispatcher.bot_data['client_id']
-    client_secret = dispatcher.bot_data['client_secret']
-
     if update.message:
         user_reply = update.message.text
         chat_id = update.message.chat_id
@@ -353,17 +350,14 @@ def handle_users_reply(update, context):
         return
     if user_reply == '/start':
         user_state = 'START'
-        access_token, token_expires = get_token(client_id, client_secret)
-        context.bot_data['access_token'] = access_token
-        context.bot_data['token_expires'] = token_expires
     else:
         user_state = db.get(chat_id)
 
-    token_expires = context.bot_data['token_expires']
-    if not check_token(token_expires) == "OK":
+    token_expires = dispatcher.bot_data['token_expires']
+    if not check_token(token_expires):
         access_token, token_expires = get_token(client_id, client_secret)
-        context.bot_data['access_token'] = access_token
-        context.bot_data['token_expires'] = token_expires
+        dispatcher.bot_data['access_token'] = access_token
+        dispatcher.bot_data['token_expires'] = token_expires
 
     states_functions = {
         'START': start,
@@ -408,12 +402,15 @@ if __name__ == '__main__':
     )
     args = parser.parse_args()
 
-    token = env.str("TG_BOT_TOKEN")
+    token = env.str("TG_BOT_TOKEN1")
     updater = Updater(token)
     dispatcher = updater.dispatcher
 
-    dispatcher.bot_data['client_id'] = env.str("CLIENT_ID")
-    dispatcher.bot_data['client_secret'] = env.str("CLIENT_SECRET")
+    client_id = env.str("CLIENT_ID")
+    client_secret = env.str("CLIENT_SECRET")
+    access_token, token_expires = get_token(client_id, client_secret)
+    dispatcher.bot_data['access_token'] = access_token
+    dispatcher.bot_data['token_expires'] = token_expires
 
     dispatcher.add_handler(CommandHandler('start', handle_users_reply))
     dispatcher.add_handler(CallbackQueryHandler(handle_users_reply))
